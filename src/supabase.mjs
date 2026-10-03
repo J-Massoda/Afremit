@@ -39,7 +39,7 @@ export class SupabaseStore {
   async createRequest(user, body) {
     const owned = await this.query('institutions', `id=eq.${encodeURIComponent(body.institution_id)}&owner_id=eq.${user.id}&status=eq.pilot_approved&select=id`);
     if (!owned.length) throw new AppError('Pilot approval is needed before creating requests.', 403);
-    const value = { institution_id: owned[0].id, created_by: user.id, title: requireText(body.title, 'Request title'), reference: requireText(body.reference, 'Private reference', 100), amount_minor: requireAmount(body.amount_minor), currency: requireCurrency(body.currency), detail: optionalText(body.detail) };
+    const value = { institution_id: owned[0].id, created_by: user.id, title: requireText(body.title, 'Request title'), reference: requireText(body.reference, 'Private reference', 100), amount_minor: requireAmount(body.amount_minor), currency: requireCurrency(body.currency), detail: optionalText(body.detail), release_condition: requireText(body.release_condition, 'Test release condition', 500) };
     return (await this.request('fee_requests', 'POST', value, 'return=representation'))[0];
   }
   async findRequest(code) {
@@ -50,9 +50,9 @@ export class SupabaseStore {
     return { ...req, institution_name: inst.name, sector: inst.sector };
   }
   async enrich(payment) {
-    const req = (await this.query('fee_requests', `id=eq.${payment.request_id}&select=title,reference,institution_id`))[0];
+    const req = (await this.query('fee_requests', `id=eq.${payment.request_id}&select=title,reference,release_condition,institution_id`))[0];
     const inst = (await this.query('institutions', `id=eq.${req.institution_id}&select=name,sector`))[0];
-    return { ...payment, title: req.title, reference: req.reference, institution_name: inst.name, sector: inst.sector };
+    return { ...payment, title: req.title, reference: req.reference, release_condition: payment.release_condition || req.release_condition, institution_name: inst.name, sector: inst.sector };
   }
   async payments(user) {
     let filter = '';
@@ -69,17 +69,18 @@ export class SupabaseStore {
     const code = requireText(body.code, 'Request code', 100);
     const payerCurrency = requireCurrency(body.payer_currency);
     const req = await this.findRequest(code);
-    const value = await this.request('rpc/pilot_create_payment', 'POST', { p_actor: user.id, p_code: code, p_currency: payerCurrency, p_key: key, p_amount: requireAmount(body.amount_minor ?? req.amount_minor), p_reference: requireText(body.payer_reference ?? req.reference, 'Payment reference', 100) });
+    if (body.accept_release_conditions !== true) throw new AppError('Review and accept the test release conditions.');
+    const value = await this.request('rpc/pilot_create_payment', 'POST', { p_actor: user.id, p_code: code, p_currency: payerCurrency, p_key: key, p_amount: requireAmount(body.amount_minor ?? req.amount_minor), p_reference: requireText(body.payer_reference ?? req.reference, 'Payment reference', 100), p_accept: true });
     return this.enrich(value);
   }
-  async act(user, id, action, key) {
-    const value = await this.request('rpc/pilot_payment_action', 'POST', { p_actor: user.id, p_payment: id, p_action: action, p_key: requireText(key, 'Action key', 100) });
+  async act(user, id, action, key, note = '') {
+    const value = await this.request('rpc/pilot_payment_action', 'POST', { p_actor: user.id, p_payment: id, p_action: action, p_key: requireText(key, 'Action key', 100), p_note: optionalText(note) });
     return this.enrich(value);
   }
   async timeline(user, paymentId) {
     if (!(await this.payments(user)).some(x => x.id === paymentId)) throw new AppError('Transaction not found.', 404);
     const [events, ledger] = await Promise.all([
-      this.query('audit_events', `resource=eq.payment&resource_id=eq.${paymentId}&select=action,actor_id,created_at&order=created_at.asc`),
+      this.query('audit_events', `resource=eq.payment&resource_id=eq.${paymentId}&select=action,actor_id,note,created_at&order=created_at.asc`),
       this.query('ledger_entries', `payment_id=eq.${paymentId}&select=account,direction,amount_minor,currency,created_at&order=created_at.asc`)
     ]);
     return { events, ledger };

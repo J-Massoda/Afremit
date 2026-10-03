@@ -45,7 +45,7 @@ export async function handleApi(request, env = {}, options = {}) {
     const action = path.match(/^payments\/([^/]+)\/actions$/);
     if (action && method === 'POST') {
       const body = await bodyOf(request);
-      return json(await store.act(user, identifier(action[1]), body.action, body.idempotency_key));
+      return json(await store.act(user, identifier(action[1]), body.action, body.idempotency_key, body.note));
     }
     const timeline = path.match(/^payments\/([^/]+)\/timeline$/);
     if (timeline && method === 'GET') return json(await store.timeline(user, identifier(timeline[1])));

@@ -30,11 +30,14 @@ export const requireCurrency = value => {
   if (!currencies.includes(value)) throw new AppError('Choose a supported display currency.');
   return value;
 };
+export const requireNote = (value, name = 'Evidence note') => requireText(value, name, 800);
 export const canTransition = (from, action, role) => ({
   fund: from === 'created' && role === 'payer',
-  allocate: from === 'test_held' && role === 'provider',
-  resolve_match: from === 'test_held' && ['provider', 'admin'].includes(role),
-  dispute: ['test_held', 'allocated'].includes(from) && ['payer', 'provider', 'admin'].includes(role),
+  submit_evidence: from === 'test_held' && role === 'provider',
+  verify_release: from === 'test_held' && role === 'admin',
+  allocate: from === 'test_held' && role === 'admin',
+  resolve_match: from === 'test_held' && role === 'admin',
+  dispute: from === 'test_held' && ['payer', 'provider', 'admin'].includes(role),
   refund: ['test_held', 'disputed'].includes(from) && role === 'admin'
 })[action] === true;
 

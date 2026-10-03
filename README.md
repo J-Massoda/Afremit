@@ -1,15 +1,14 @@
 # Afremit pilot
 
-Afremit is a South African company exploring a clearer way for people abroad to support specific services provided in Africa. A parent might receive a private school fee request, review its student reference, and follow it until the school confirms how the payment was allocated. A family could use a similar process for a clinic estimate, or a project owner for a construction milestone.
+Afremit is a South African company exploring a clearer way for people abroad to support specific services provided in Africa. A parent might receive a private school fee request, review its student reference, and follow the provider evidence and Afremit reviewer decision before a simulated release. A family could use a similar process for a clinic estimate, or a project owner for a construction milestone.
 
 **This repository is a working pilot with simulated payments.** It accepts no money and has no live bank, crypto, insurance, or escrow integration. "Held," "allocated," and "refunded" describe test ledger states only. Pilot approval means permission to test software; it is not a financial or institutional certification.
 
-## Review this update
+## Escrow-style verification in this pilot
 
-- Afremit's supplied transparent logo replaces the temporary text mark across the public site and pilot workspace.
-- White, navy (`#00246E`), bright blue (`#4985FF`), and pale blue now define the public site and workspace.
-- New public content explains provider, payer, and Afremit reviewer examples; a partner/investor overview; and a pilot FAQ. These pages describe a simulated workflow, not live payments or an active escrow service.
-- No migration or backend contract changed in this design and content update.
+The provider states the condition for releasing a test payment when creating a request. The payer sees and accepts that condition. After a simulated hold, the provider submits an evidence note. An Afremit reviewer checks the evidence and reference, records a decision, and then triggers the simulated release. A payer or provider can raise an exception while value is held; an Afremit reviewer can record a reason and simulate a refund. A mismatched amount cannot be released against the original request. Every decision is recorded in the audit history.
+
+These are **software gates on fictional ledger entries**, not real escrow, custody, insurance, or a promise of payment. No external provider or live money is connected. Evidence notes must not contain sensitive documents or personal records.
 
 ## What works
 
@@ -19,7 +18,7 @@ Afremit is a South African company exploring a clearer way for people abroad to 
 - Applications for all three provider types; an Afremit reviewer can approve or decline pilot access.
 - A provider can create a single private fee/service/milestone request without building a full catalogue. The request has a hard-to-guess share code.
 - A payer can review the request, create a test transaction, simulate the held state, raise an exception, and see the audit history.
-- A provider can confirm allocation. An incorrect amount or reference requires manual review first. An Afremit reviewer can simulate a refund while test value is still held.
+- A provider submits evidence. An Afremit reviewer verifies the release condition and reference before simulating release. A mismatched amount needs a corrected request and new test payment. Held test value can be disputed and refunded with an audited reason.
 - A double-entry test ledger and idempotent actions. The admin dashboard counts real applications/requests separately from test payments, with real money volume fixed at zero.
 - A local text helper suggests an amount/reference from pasted text. It sends nothing to an AI API; staff must check its output. Document upload, OCR, and paid AI services are **not** part of this release.
 
@@ -31,7 +30,7 @@ Requires Node.js 20 or newer. No package installation or API key is needed for t
 npm run dev
 ```
 
-Open `http://localhost:8788`, then **Open pilot**. Choose a fictional account. Use the school account to inspect its example fee request, then sign out and use the payer account with `SAMPLE-SCHOOL-2026` to start a test transaction. Return as the school to confirm allocation, and as Afremit to inspect the review queue. Test a mismatch by changing the entered reference or amount.
+Open `http://localhost:8788`, then **Open pilot**. Choose a fictional account. Use the school account to inspect its example fee request, then sign out and use the payer account with `SAMPLE-SCHOOL-2026` to start a test transaction. Return as the school to submit an evidence note, and as Afremit to verify the condition and simulate release or refund. Test a mismatch by changing the entered reference or amount.
 
 The local server persists changes in `.data/local.json`. Delete that file to restore only fictional examples. No live provider or payout is contacted.
 
@@ -42,9 +41,17 @@ npm run build
 
 `npm run build` copies the public frontend to `dist/`. The Pages Functions in `functions/` are deployed by Cloudflare separately.
 
+## GitHub Pages: public preview only
+
+Push the **contents of this folder** to the root of a new GitHub repository. The supplied `.github/workflows/pages.yml` publishes a static version of the public site from `main`. In the repository, open **Settings → Pages → Build and deployment**, choose **GitHub Actions**, and let the workflow run (or start it under **Actions**). The resulting URL is usually `https://YOUR_USERNAME.github.io/YOUR_REPOSITORY/`. You do not select `main /root` or `main /docs` for this workflow.
+
+To inspect exactly what GitHub Pages will serve before pushing, run `npm run build:pages` and open `pages-dist/index.html`. The build adjusts asset paths for a repository URL, replaces pilot workspace links with informational links, and excludes API-dependent JavaScript. The static page is a public concept and pilot overview; it cannot register users or run requests and test transactions. It does not use Supabase or Cloudflare.
+
+The `.github/workflows/check.yml` Action checks tests and the main build. It is separate from the Pages publishing Action. When the connected pilot is ready, deploy the same repository to Cloudflare Pages using the configuration below, then link the static overview to that hosted pilot if you want to keep both URLs.
+
 ## Connect a real pilot database
 
-Create a **separate** Supabase project for Afremit. Never reuse Citebid's database or credentials. In the Supabase SQL Editor, run [`sql/001_pilot.sql`](sql/001_pilot.sql). Enable email authentication and email confirmation in the Supabase Auth settings. Register your own Afremit account, confirm its email, then promote only that account in the SQL Editor:
+Create a **separate** Supabase project for Afremit. Never reuse Citebid's database or credentials. In the Supabase SQL Editor, run [`sql/001_pilot.sql`](sql/001_pilot.sql), then [`sql/002_escrow_workflow.sql`](sql/002_escrow_workflow.sql). For an existing project that has already run 001, run only 002. The second migration removes the old provider allocation RPC and adds the reviewer gate. Enable email authentication and email confirmation in the Supabase Auth settings. Register your own Afremit account, confirm its email, then promote only that account in the SQL Editor:
 
 ```sql
 update public.profiles set role='admin' where email='YOUR_ACTUAL_EMAIL';
@@ -76,7 +83,7 @@ The recommended structure is **one Cloudflare Pages project** at first:
 
 In Cloudflare Pages, select the GitHub repository and set **Root directory** to the repository root (leave the field blank), **Build command** to `npm run build`, and **Build output directory** to `dist`. Pages Functions live under `functions/` at the repository root. For preview branches, keep a separate Supabase project or branch and separate secrets from production. Configure the custom domain in Cloudflare and adjust Namecheap DNS only **after** reviewing and testing the deployment.
 
-This project does not include an automatic GitHub Pages workflow because its connected private API requires a server runtime. A static GitHub Pages deployment would show only the public site and could not securely run pilot transactions.
+GitHub Pages publishes the informational preview through the workflow above. The connected private API requires Cloudflare Pages Functions and Supabase; GitHub Pages cannot run pilot transactions.
 
 ## Technical map
 
@@ -88,7 +95,8 @@ This project does not include an automatic GitHub Pages workflow because its con
 | `src/supabase.mjs` | Supabase persistence via server-side REST and atomic RPC functions |
 | `src/memory.mjs` | Local fictional data and workflow for offline testing |
 | `src/domain.mjs` | Shared validation, states, and test ledger rules |
-| `sql/001_pilot.sql` | Schema, row-level security, audit triggers, and atomic transaction procedures |
+| `sql/001_pilot.sql` | Base schema, row-level security, audit triggers, and atomic transaction procedures |
+| `sql/002_escrow_workflow.sql` | Release conditions, evidence, reviewer gate, and audited decisions |
 | `tests/` | Permission, state, idempotency, mismatch, and ledger tests |
 
 ## Important boundaries
@@ -99,7 +107,7 @@ This project does not include an automatic GitHub Pages workflow because its con
 - No insurance protection, guaranteed settlement, live pay-in/payout, card collection, stablecoin conversion, or government institution integration is active.
 - The hosted Supabase path is prepared but cannot be end-to-end tested until the Afremit project and Cloudflare secrets are provisioned. Local workflow and API tests do run without them.
 
-This repository is intended to stand alone under a new name such as `afremit-pilot`. The older `Afremit-function` repository and its Vercel/WhatsApp deployments are not used by this project. Do not point the old deployment at this new project.
+This repository stands alone as `J-Massoda/Afremit`. The older `Afremit-function` repository and its Vercel/WhatsApp deployments are not used by this project. Do not point the old deployment at this new project.
 
 ### Logo asset
 
