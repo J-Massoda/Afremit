@@ -14,19 +14,7 @@ async function init() {
   try { config = await (await fetch('/api/config')).json(); } catch { /* Show network error on pilot screen. */ }
   if (config.demo) session = { demo: localStorage.getItem('afremit-demo') || '' };
   else { try { session = JSON.parse(localStorage.getItem('afremit-session') || 'null'); } catch {} }
-  $('#year').textContent = new Date().getFullYear();
   window.addEventListener('hashchange', route); route();
-  const steps = [...document.querySelectorAll('.journey-step')];
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver(entries => { entries.forEach(entry => { if (entry.isIntersecting) setStep(Number(entry.target.dataset.step)); }); }, { rootMargin: '-30% 0px -45% 0px' });
-    steps.forEach(step => observer.observe(step));
-  }
-}
-function setStep(n) {
-  document.querySelectorAll('.journey-step').forEach((el, index) => el.classList.toggle('active', index === n));
-  document.querySelectorAll('.route-node').forEach((el, index) => el.classList.toggle('active', index <= n));
-  $('.route-active').style.strokeDashoffset = 985 - n * 290;
-  $('#diagram-label').textContent = ['01 · School request created','02 · Payer reviews the details','03 · Test value held','04 · Afremit verifies test release'][n];
 }
 function authHeaders() { return config.demo ? { 'X-Demo-User': session?.demo || '' } : { Authorization: `Bearer ${session?.access_token || ''}` }; }
 async function api(path, method = 'GET', body) {

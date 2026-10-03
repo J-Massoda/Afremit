@@ -6,7 +6,7 @@ await mkdir(output);
 await cp('public', output, { recursive: true });
 
 let html = await readFile(`${output}/index.html`, 'utf8');
-const required = ['href="/styles.css"', 'src="/app.js"', 'href="#app"', '<span id="year"></span>'];
+const required = ['href="/styles.css"', 'src="/site.js"', 'src="/app.js"', 'href="#app"', '<span id="year"></span>'];
 for (const value of required) {
   if (!html.includes(value)) throw new Error(`Static preview source changed: missing ${value}`);
 }
@@ -15,6 +15,7 @@ for (const value of required) {
 html = html.replaceAll('href="/assets/', 'href="./assets/');
 html = html.replaceAll('src="/assets/', 'src="./assets/');
 html = html.replace('href="/styles.css"', 'href="./styles.css"');
+html = html.replace('src="/site.js"', 'src="./site.js"');
 html = html.replaceAll('href="/#"', 'href="#"');
 
 // The local and Cloudflare builds keep the working pilot. The Pages edition is
@@ -33,7 +34,8 @@ html = html.replace('Providers can apply in the pilot workspace.', 'Providers ca
 html = html.replace('Public pilot registration will be available when the connected deployment is configured.', 'The interactive workspace requires a separate connected deployment.');
 html = html.replace('Applications and pilot activity can involve real participants.', 'The connected pilot is designed for guided tests with consenting participants.');
 html = html.replace('<span id="year"></span>', String(new Date().getFullYear()));
-html = html.replace('  <div id="app-shell" hidden></div>\n  <script type="module" src="/app.js"></script>\n', '');
+html = html.replace('  <div id="app-shell" hidden></div>\n', '');
+html = html.replace('  <script type="module" src="/app.js"></script>\n', '');
 await writeFile(`${output}/index.html`, html);
 await unlink(`${output}/app.js`);
 await writeFile(`${output}/.nojekyll`, '');
